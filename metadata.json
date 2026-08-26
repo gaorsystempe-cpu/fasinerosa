@@ -1,0 +1,7 @@
+{
+  "name": "La Facinerosa - Picantería Piurana",
+  "description": "Sistema de gestión gastronómica para La Facinerosa en Mercado 2 de Surquillo Puesto 651: Punto de Venta (POS) para local/mesas, central de pedidos web, reportes de ventas, stock de productos y personalización del front-end.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
