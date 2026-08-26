@@ -8,6 +8,7 @@ interface HeaderProps {
   cartCount: number;
   cartTotal: number;
   onOpenCart: () => void;
+  onNavigateToMenu?: () => void;
   orderType?: OrderType;
   onChangeOrderType?: (type: OrderType) => void;
   searchQuery?: string;
@@ -20,8 +21,20 @@ export const Header: React.FC<HeaderProps> = ({
   cartCount,
   cartTotal,
   onOpenCart,
+  onNavigateToMenu,
 }) => {
   const { settings } = useStore();
+
+  const handleVerCarta = () => {
+    if (onNavigateToMenu) {
+      onNavigateToMenu();
+    } else {
+      const menuEl = document.getElementById('menu-section');
+      if (menuEl) {
+        menuEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-[#F9F9F9]/95 backdrop-blur-md border-b border-[#00167A]/10 shadow-xs">
@@ -65,15 +78,13 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </div>
 
-        <a
-          href={`https://wa.me/${settings.phone.replace(/\D/g, '')}?text=Hola%20La%20Facinerosa,%20deseo%20hacer%20un%20pedido`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-2.5 py-1 rounded-lg bg-[#FFF3C1] text-[#00167A] text-[11px] font-bold flex items-center gap-1 shrink-0 shadow-xs"
+        <button
+          type="button"
+          onClick={handleVerCarta}
+          className="px-3 py-1 rounded-lg bg-[#FFF3C1] text-[#00167A] text-[11px] font-extrabold flex items-center gap-1 shrink-0 shadow-xs active:scale-95 transition-all cursor-pointer"
         >
-          <Phone className="w-3 h-3" />
-          <span>Pedir</span>
-        </a>
+          <span>Ver Carta</span>
+        </button>
       </div>
 
       {/* Main Navigation Bar */}

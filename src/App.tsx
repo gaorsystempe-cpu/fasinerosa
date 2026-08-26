@@ -338,6 +338,10 @@ export default function App() {
         cartCount={cartCount}
         cartTotal={cartTotal}
         onOpenCart={() => setIsCartOpen(true)}
+        onNavigateToMenu={() => {
+          setActiveTab('menu');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         orderType={orderType}
         onChangeOrderType={setOrderType}
         searchQuery={searchQuery}
@@ -413,25 +417,16 @@ export default function App() {
                     </p>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="shrink-0">
                     <button
                       onClick={() => {
                         setActiveTab('menu');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="px-5 py-2.5 bg-[#00167A] text-[#FFF3C1] text-xs font-bold rounded-xl shadow-xs hover:bg-[#00167A]/90 transition-all cursor-pointer"
+                      className="w-full sm:w-auto px-6 py-3 bg-[#00167A] text-[#FFF3C1] text-xs font-bold rounded-xl shadow-xs hover:bg-[#00167A]/90 transition-all cursor-pointer text-center"
                     >
                       Ver la Carta
                     </button>
-                    <a
-                      href={`https://wa.me/${settings.phone.replace(/\D/g, '')}?text=Hola%20La%20Facinerosa,%20deseo%20hacer%20un%20pedido%20especial`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2.5 bg-white text-[#00167A] text-xs font-bold rounded-xl border border-[#00167A]/20 shadow-xs flex items-center gap-1.5"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>WhatsApp</span>
-                    </a>
                   </div>
                 </div>
               </div>
