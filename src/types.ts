@@ -29,6 +29,7 @@ export interface Product {
   isPopular?: boolean;
   isSpicy?: boolean;
   isAvailable?: boolean;
+  isHidden?: boolean;
   prepTime?: string;
   portions?: string;
   availableExtras?: ExtraOption[];

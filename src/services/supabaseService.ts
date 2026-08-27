@@ -315,6 +315,7 @@ export const supabaseService = {
         isPopular: Boolean(row.is_popular),
         isSpicy: Boolean(row.is_spicy),
         isAvailable: row.is_available ?? true,
+        isHidden: Boolean(row.is_hidden),
         prepTime: row.prep_time,
         portions: row.portions,
         availableExtras: row.product_extras && row.product_extras.length > 0
@@ -347,6 +348,7 @@ export const supabaseService = {
         is_popular: Boolean(product.isPopular),
         is_spicy: Boolean(product.isSpicy),
         is_available: product.isAvailable !== false,
+        is_hidden: Boolean(product.isHidden),
         prep_time: product.prepTime || '15-20 min',
         portions: product.portions || '1-2 personas',
         updated_at: new Date().toISOString(),
@@ -410,6 +412,19 @@ export const supabaseService = {
       const { error } = await supabase
         .from('products')
         .update({ is_available: isAvailable, updated_at: new Date().toISOString() })
+        .eq('id', productId);
+      return !error;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  async updateProductVisibility(productId: string, isHidden: boolean): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_hidden: isHidden, updated_at: new Date().toISOString() })
         .eq('id', productId);
       return !error;
     } catch (e) {

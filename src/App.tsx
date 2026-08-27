@@ -23,7 +23,8 @@ import { Check, Search, Sparkles, MessageSquare, Phone, MapPin, Heart, Utensils,
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
-  const { products, settings, isAdmin } = useStore();
+  const { products: rawProducts, settings, isAdmin } = useStore();
+  const products = useMemo(() => rawProducts.filter(p => !p.isHidden), [rawProducts]);
 
 
   // Admin View state

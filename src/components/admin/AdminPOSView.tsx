@@ -35,7 +35,7 @@ import { ThermalTicketModal } from './ThermalTicketModal';
 
 export const AdminPOSView: React.FC = () => {
   const { 
-    products, 
+    products: rawProducts, 
     cashShift, 
     openCashShift, 
     closeCashShift, 
@@ -74,6 +74,8 @@ export const AdminPOSView: React.FC = () => {
   const [completedSale, setCompletedSale] = useState<POSSale | null>(null);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [ticketType, setTicketType] = useState<'cliente' | 'cocina'>('cliente');
+
+  const products = useMemo(() => rawProducts.filter(p => !p.isHidden), [rawProducts]);
 
   // Filtered products
   const availableProducts = useMemo(() => {

@@ -18,7 +18,9 @@ import {
   UploadCloud,
   Camera,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const SAMPLE_PERUVIAN_PHOTOS = [
@@ -31,7 +33,7 @@ const SAMPLE_PERUVIAN_PHOTOS = [
 ];
 
 export const AdminProductsView: React.FC = () => {
-  const { products, toggleProductAvailability, saveProduct, deleteProduct, resetProducts, categories } = useStore();
+  const { products, toggleProductAvailability, toggleProductVisibility, saveProduct, deleteProduct, resetProducts, categories } = useStore();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('todos');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -193,12 +195,13 @@ export const AdminProductsView: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
         {filteredProducts.map(product => {
           const isAvailable = product.isAvailable !== false;
+          const isHidden = product.isHidden === true;
 
           return (
             <div
               key={product.id}
               className={`bg-white rounded-3xl border transition-all p-3.5 flex flex-col justify-between shadow-xs ${
-                isAvailable ? 'border-gray-200' : 'border-red-200 bg-red-50/20'
+                isHidden ? 'border-gray-300 opacity-60 bg-gray-50' : (isAvailable ? 'border-gray-200' : 'border-red-200 bg-red-50/20')
               }`}
             >
               <div>
@@ -207,7 +210,7 @@ export const AdminProductsView: React.FC = () => {
                     src={product.image}
                     alt={product.name}
                     referrerPolicy="no-referrer"
-                    className={`w-full h-full object-cover ${!isAvailable ? 'grayscale opacity-75' : ''}`}
+                    className={`w-full h-full object-cover ${!isAvailable || isHidden ? 'grayscale opacity-75' : ''}`}
                   />
                   {product.badge && (
                     <span className="absolute top-2 left-2 px-2 py-0.5 bg-[#00167A] text-[#FFF3C1] text-[10px] font-bold rounded-lg uppercase">
@@ -237,20 +240,36 @@ export const AdminProductsView: React.FC = () => {
 
               {/* Action Bar */}
               <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-between gap-2">
-                {/* Stock Toggle Switch */}
-                <button
-                  type="button"
-                  onClick={() => toggleProductAvailability(product.id)}
-                  className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
-                    isAvailable
-                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                      : 'bg-red-100 text-red-800 hover:bg-red-200'
-                  }`}
-                  title="Cambiar disponibilidad en tienda y POS"
-                >
-                  <span className={`w-2 h-2 rounded-full ${isAvailable ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                  <span>{isAvailable ? 'Disponible' : 'Agotado'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Stock Toggle Switch */}
+                  <button
+                    type="button"
+                    onClick={() => toggleProductAvailability(product.id)}
+                    className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
+                      isAvailable
+                        ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                        : 'bg-red-100 text-red-800 hover:bg-red-200'
+                    }`}
+                    title="Cambiar disponibilidad en tienda y POS"
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isAvailable ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                    <span>{isAvailable ? 'Disponible' : 'Agotado'}</span>
+                  </button>
+                  
+                  {/* Visibility Toggle Switch */}
+                  <button
+                    type="button"
+                    onClick={() => toggleProductVisibility(product.id)}
+                    className={`flex items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer ${
+                      isHidden
+                        ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    }`}
+                    title={isHidden ? "Mostrar en tienda y POS" : "Ocultar de tienda y POS"}
+                  >
+                    {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
 
                 <div className="flex items-center gap-1">
                   <button

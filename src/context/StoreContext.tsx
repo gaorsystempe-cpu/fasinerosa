@@ -30,6 +30,7 @@ interface StoreContextType {
   // Products
   products: Product[];
   toggleProductAvailability: (id: string) => void;
+  toggleProductVisibility: (id: string) => void;
   saveProduct: (product: Product) => Promise<boolean>;
   deleteProduct: (id: string) => Promise<boolean>;
   resetProducts: () => Promise<void>;
@@ -441,6 +442,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const toggleProductVisibility = (id: string) => {
+    const target = products.find(p => p.id === id);
+    const nextState = target?.isHidden === true ? false : true;
+
+    setProducts(prev =>
+      prev.map(p => (p.id === id ? { ...p, isHidden: nextState } : p))
+    );
+
+    if (supabaseService.isAvailable()) {
+      supabaseService.updateProductVisibility(id, nextState);
+    }
+  };
+
   const saveProduct = async (product: Product): Promise<boolean> => {
     setProducts(prev => {
       const exists = prev.some(p => p.id === product.id);
@@ -670,6 +684,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         products,
         toggleProductAvailability,
+        toggleProductVisibility,
         saveProduct,
         deleteProduct,
         resetProducts,
