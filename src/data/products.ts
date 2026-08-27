@@ -1,4 +1,4 @@
-import { Product, CategoryId } from '../types';
+import { Product, CategoryId, Category } from '../types';
 
 export const COMMON_EXTRAS = [
   { id: 'chifles', name: 'Porción de Chifles Piuranos Artesanales', price: 6 },
@@ -332,50 +332,62 @@ export interface CategoryMetadata {
   badge?: string;
 }
 
-export const CATEGORIES = [
+export const DEFAULT_CATEGORIES: Category[] = [
   { 
     id: 'todos', 
     name: 'Todos los Platos', 
     icon: 'Utensils',
-    image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80'
+    image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
+    sortOrder: 0
   },
   { 
     id: 'insignias', 
     name: 'Platos Insignia', 
     icon: 'Flame',
-    image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80'
+    image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80',
+    badge: 'Especialidad',
+    sortOrder: 1
   },
   { 
     id: 'entradas', 
     name: 'Entradas & Piqueos', 
     icon: 'Sparkles',
-    image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=800&q=80'
+    image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=800&q=80',
+    sortOrder: 2
   },
   { 
     id: 'marinos', 
     name: 'Ceviches & Marinos', 
     icon: 'Fish',
-    image: 'https://images.unsplash.com/photo-1535400255456-984241443b29?auto=format&fit=crop&w=800&q=80'
+    image: 'https://images.unsplash.com/photo-1535400255456-984241443b29?auto=format&fit=crop&w=800&q=80',
+    badge: 'Del Día',
+    sortOrder: 3
   },
   { 
     id: 'rondas', 
     name: 'Rondas Familiares', 
     icon: 'Users',
-    image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80'
+    image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
+    badge: 'Para Compartir',
+    sortOrder: 4
   },
   { 
     id: 'bebidas', 
     name: 'Chichas & Bebidas', 
     icon: 'Wine',
-    image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=800&q=80'
+    image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=800&q=80',
+    sortOrder: 5
   },
   { 
     id: 'guarniciones', 
     name: 'Guarniciones & Postres', 
     icon: 'Cookie',
-    image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=800&q=80'
+    image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=800&q=80',
+    sortOrder: 6
   },
-] as const;
+];
+
+export const CATEGORIES = DEFAULT_CATEGORIES;
 
 export const LIMA_DISTRICTS = [
   { name: 'Surquillo (Local Mercado 2)', fee: 4 },

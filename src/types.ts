@@ -1,11 +1,14 @@
-export type CategoryId = 
-  | 'todos'
-  | 'insignias'
-  | 'entradas'
-  | 'marinos'
-  | 'rondas'
-  | 'bebidas'
-  | 'guarniciones';
+export type CategoryId = string;
+
+export interface Category {
+  id: string;
+  name: string;
+  icon?: string;
+  image: string;
+  badge?: string;
+  description?: string;
+  sortOrder?: number;
+}
 
 export interface ExtraOption {
   id: string;
@@ -141,5 +144,5 @@ export interface AppSettings {
   adminPin: string;
 }
 
-export type AdminTab = 'pos' | 'pedidos_web' | 'reportes' | 'productos' | 'configuracion';
+export type AdminTab = 'pos' | 'pedidos_web' | 'reportes' | 'productos' | 'categorias' | 'configuracion';
 

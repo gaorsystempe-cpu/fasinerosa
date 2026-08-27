@@ -7,9 +7,10 @@ import {
   AppSettings, 
   AdminTab, 
   OrderStatus, 
-  PaymentMethod 
+  PaymentMethod,
+  Category
 } from '../types';
-import { PRODUCTS } from '../data/products';
+import { PRODUCTS, DEFAULT_CATEGORIES } from '../data/products';
 import { 
   DEFAULT_SETTINGS, 
   INITIAL_ORDERS, 
@@ -20,6 +21,12 @@ import { supabaseService } from '../services/supabaseService';
 import { isSupabaseConfigured } from '../lib/supabase';
 
 interface StoreContextType {
+  // Categories
+  categories: Category[];
+  saveCategory: (category: Category) => Promise<boolean>;
+  deleteCategory: (id: string) => Promise<boolean>;
+  resetCategories: () => Promise<void>;
+
   // Products
   products: Product[];
   toggleProductAvailability: (id: string) => void;
@@ -69,6 +76,7 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
+  CATEGORIES: 'la_facinerosa_categories_v2',
   PRODUCTS: 'la_facinerosa_products_v2',
   ORDERS: 'la_facinerosa_orders_v2',
   POS_SALES: 'la_facinerosa_pos_sales_v2',
@@ -83,6 +91,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [syncStatus, setSyncStatus] = useState<'connected' | 'disconnected' | 'syncing'>(
     isSupabaseConfigured ? 'connected' : 'disconnected'
   );
+
+  // --- Categories State ---
+  const [categories, setCategories] = useState<Category[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_CATEGORIES;
+  });
 
   // --- Products State ---
   const [products, setProducts] = useState<Product[]>(() => {
@@ -165,7 +184,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setSyncStatus('syncing');
 
     try {
-      // 1. Products Sync
+      // 1. Categories Sync
+      const remoteCategories = await supabaseService.getCategories();
+      if (remoteCategories !== null) {
+        if (remoteCategories.length > 0) {
+          setCategories(remoteCategories);
+        } else if (!isSeedingRef.current) {
+          await supabaseService.seedDefaultCategories(DEFAULT_CATEGORIES);
+          const seeded = await supabaseService.getCategories();
+          if (seeded && seeded.length > 0) {
+            setCategories(seeded);
+          }
+        }
+      }
+
+      // 2. Products Sync
       const remoteProducts = await supabaseService.getProducts();
       if (remoteProducts !== null) {
         if (remoteProducts.length > 0) {
@@ -258,6 +291,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
       });
 
+      // Realtime subscription for Categories
+      const categoriesChannel = supabaseService.subscribeToCategories(() => {
+        supabaseService.getCategories().then(fresh => {
+          if (fresh && fresh.length > 0) setCategories(fresh);
+        });
+      });
+
       // Realtime subscription for Settings
       const settingsChannel = supabaseService.subscribeToSettings(() => {
         supabaseService.getAppSettings().then(fresh => {
@@ -291,6 +331,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (ordersChannel) ordersChannel.unsubscribe();
         if (salesChannel) salesChannel.unsubscribe();
         if (productsChannel) productsChannel.unsubscribe();
+        if (categoriesChannel) categoriesChannel.unsubscribe();
         if (settingsChannel) settingsChannel.unsubscribe();
         if (shiftsChannel) shiftsChannel.unsubscribe();
       };
@@ -298,6 +339,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [syncWithSupabase]);
 
   // Sync to LocalStorage as offline backup
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [categories]);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
@@ -345,6 +394,38 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error(e);
     }
   }, [isAdmin]);
+
+  // --- Category Methods ---
+  const saveCategory = async (category: Category): Promise<boolean> => {
+    setCategories(prev => {
+      const exists = prev.some(c => c.id === category.id);
+      if (exists) {
+        return prev.map(c => (c.id === category.id ? category : c));
+      }
+      return [...prev, category];
+    });
+
+    if (supabaseService.isAvailable()) {
+      const success = await supabaseService.saveCategory(category);
+      return success;
+    }
+    return true;
+  };
+
+  const deleteCategory = async (id: string): Promise<boolean> => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+    if (supabaseService.isAvailable()) {
+      return await supabaseService.deleteCategory(id);
+    }
+    return true;
+  };
+
+  const resetCategories = async (): Promise<void> => {
+    setCategories(DEFAULT_CATEGORIES);
+    if (supabaseService.isAvailable()) {
+      await supabaseService.seedDefaultCategories(DEFAULT_CATEGORIES);
+    }
+  };
 
   // --- Product Methods ---
   const toggleProductAvailability = (id: string) => {
@@ -582,6 +663,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <StoreContext.Provider
       value={{
+        categories,
+        saveCategory,
+        deleteCategory,
+        resetCategories,
+
         products,
         toggleProductAvailability,
         saveProduct,

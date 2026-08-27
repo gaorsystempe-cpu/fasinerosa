@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Order, POSSale, OrderStatus, OrderPaymentStatus, Product, CashShift, AppSettings, ExtraOption } from '../types';
+import { Order, POSSale, OrderStatus, OrderPaymentStatus, Product, CashShift, AppSettings, ExtraOption, Category } from '../types';
 
 export const supabaseService = {
   isAvailable: () => isSupabaseConfigured && !!supabase,
@@ -334,9 +334,7 @@ export const supabaseService = {
   async saveProduct(product: Product): Promise<boolean> {
     if (!this.isAvailable() || !supabase) return false;
     try {
-      // 1. Ensure category is valid
-      const validCategories = ['insignias', 'entradas', 'marinos', 'rondas', 'bebidas', 'guarniciones'];
-      const categoryCode = validCategories.includes(product.category) ? product.category : 'insignias';
+      const categoryCode = product.category || 'insignias';
 
       const { error } = await supabase.from('products').upsert({
         id: product.id,
@@ -415,6 +413,89 @@ export const supabaseService = {
         .eq('id', productId);
       return !error;
     } catch (e) {
+      return false;
+    }
+  },
+
+  // --- CATEGORIES CRUD ---
+  async getCategories(): Promise<Category[] | null> {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.warn('Supabase getCategories error:', error.message);
+        return null;
+      }
+
+      if (!data || data.length === 0) return [];
+
+      return data.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        icon: row.icon || 'Utensils',
+        image: row.image_url || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
+        badge: row.badge || undefined,
+        description: row.description || undefined,
+        sortOrder: row.sort_order ?? 0,
+      }));
+    } catch (e) {
+      console.warn('Supabase getCategories exception:', e);
+      return null;
+    }
+  },
+
+  async saveCategory(category: Category): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      const { error } = await supabase.from('categories').upsert({
+        id: category.id,
+        name: category.name,
+        icon: category.icon || 'Utensils',
+        image_url: category.image || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
+        badge: category.badge || null,
+        description: category.description || null,
+        sort_order: category.sortOrder ?? 0,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        console.error('Error saving category in Supabase:', error.message);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Exception saving category:', e);
+      return false;
+    }
+  },
+
+  async deleteCategory(categoryId: string): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      const { error } = await supabase.from('categories').delete().eq('id', categoryId);
+      if (error) {
+        console.warn('Error deleting category in Supabase:', error.message);
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async seedDefaultCategories(defaultCategories: Category[]): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      for (const cat of defaultCategories) {
+        await this.saveCategory(cat);
+      }
+      return true;
+    } catch (e) {
+      console.warn('Error seeding categories in Supabase:', e);
       return false;
     }
   },
@@ -662,6 +743,27 @@ export const supabaseService = {
       return channel;
     } catch (e) {
       console.warn('Failed to subscribe to Supabase products realtime:', e);
+      return null;
+    }
+  },
+
+  subscribeToCategories(onCategoriesChange: (payload: any) => void) {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const channel = supabase
+        .channel('categories_realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'la_facinerosa', table: 'categories' },
+          (payload) => {
+            onCategoriesChange(payload);
+          }
+        )
+        .subscribe();
+
+      return channel;
+    } catch (e) {
+      console.warn('Failed to subscribe to Supabase categories realtime:', e);
       return null;
     }
   },

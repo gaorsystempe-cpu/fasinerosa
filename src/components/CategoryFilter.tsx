@@ -1,7 +1,23 @@
 import React from 'react';
-import { CATEGORIES } from '../data/products';
+import { useStore } from '../context/StoreContext';
 import { CategoryId } from '../types';
-import { Flame, Sparkles, Fish, Users, Wine, Cookie, Utensils } from 'lucide-react';
+import { 
+  Flame, 
+  Sparkles, 
+  Fish, 
+  Users, 
+  Wine, 
+  Cookie, 
+  Utensils,
+  Coffee,
+  Beer,
+  Pizza,
+  IceCream,
+  ChefHat,
+  Salad,
+  Sandwich,
+  Soup
+} from 'lucide-react';
 
 interface CategoryFilterProps {
   selectedCategory: CategoryId;
@@ -14,7 +30,9 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   onSelectCategory,
   categoryCounts,
 }) => {
-  const getIcon = (iconName: string) => {
+  const { categories } = useStore();
+
+  const getIcon = (iconName?: string) => {
     switch (iconName) {
       case 'Flame':
         return <Flame className="w-4 h-4" />;
@@ -28,6 +46,22 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
         return <Wine className="w-4 h-4" />;
       case 'Cookie':
         return <Cookie className="w-4 h-4" />;
+      case 'Coffee':
+        return <Coffee className="w-4 h-4" />;
+      case 'Beer':
+        return <Beer className="w-4 h-4" />;
+      case 'Pizza':
+        return <Pizza className="w-4 h-4" />;
+      case 'IceCream':
+        return <IceCream className="w-4 h-4" />;
+      case 'ChefHat':
+        return <ChefHat className="w-4 h-4" />;
+      case 'Salad':
+        return <Salad className="w-4 h-4" />;
+      case 'Sandwich':
+        return <Sandwich className="w-4 h-4" />;
+      case 'Soup':
+        return <Soup className="w-4 h-4" />;
       case 'Utensils':
       default:
         return <Utensils className="w-4 h-4" />;
@@ -38,7 +72,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
     <div className="sticky top-[108px] sm:top-[73px] z-30 bg-[#F9F9F9]/95 backdrop-blur-md py-3.5 border-b border-[#00167A]/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-          {CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const isSelected = selectedCategory === cat.id;
             const count = categoryCounts[cat.id as CategoryId] || 0;
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CATEGORIES } from '../data/products';
+import { useStore } from '../context/StoreContext';
 import { CategoryId } from '../types';
 
 interface CategoriesGridProps {
@@ -11,8 +11,10 @@ export const CategoriesGrid: React.FC<CategoriesGridProps> = ({
   categoryCounts,
   onSelectCategory,
 }) => {
+  const { categories } = useStore();
+
   // Exclude 'todos' from the grid so it only shows specific categories matching screenshot 3
-  const displayCategories = CATEGORIES.filter((c) => c.id !== 'todos');
+  const displayCategories = categories.filter((c) => c.id !== 'todos');
 
   return (
     <section className="py-4 sm:py-6 px-4 sm:px-6">
@@ -40,6 +42,10 @@ export const CategoriesGrid: React.FC<CategoriesGridProps> = ({
                 alt={cat.name}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 loading="lazy"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src =
+                    'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80';
+                }}
               />
 
               {/* Dark Gradient Overlay for Maximum Legibility */}
@@ -61,3 +67,4 @@ export const CategoriesGrid: React.FC<CategoriesGridProps> = ({
     </section>
   );
 };
+

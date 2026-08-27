@@ -15,12 +15,14 @@ import {
   ShieldCheck,
   RefreshCw,
   Wifi,
-  WifiOff
+  WifiOff,
+  Layers
 } from 'lucide-react';
 import { AdminPOSView } from './AdminPOSView';
 import { AdminWebOrdersView } from './AdminWebOrdersView';
 import { AdminReportsView } from './AdminReportsView';
 import { AdminProductsView } from './AdminProductsView';
+import { AdminCategoriesView } from './AdminCategoriesView';
 import { AdminSettingsView } from './AdminSettingsView';
 import { BrandLogo } from '../BrandLogo';
 
@@ -55,7 +57,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onReturnToStorefront }
     { id: 'pos', label: 'Punto de Venta', icon: Store },
     { id: 'pedidos_web', label: 'Pedidos Web', icon: ShoppingBag, badge: pendingOrdersCount },
     { id: 'reportes', label: 'Reportes de Venta', icon: BarChart3 },
-    { id: 'productos', label: 'Catálogo & Stock', icon: UtensilsCrossed },
+    { id: 'productos', label: 'Platos & Stock', icon: UtensilsCrossed },
+    { id: 'categorias', label: 'Categorías & Fotos', icon: Layers },
     { id: 'configuracion', label: 'Configuración Front', icon: Settings },
   ];
 
@@ -163,6 +166,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onReturnToStorefront }
         {activeAdminTab === 'pedidos_web' && <AdminWebOrdersView />}
         {activeAdminTab === 'reportes' && <AdminReportsView />}
         {activeAdminTab === 'productos' && <AdminProductsView />}
+        {activeAdminTab === 'categorias' && <AdminCategoriesView />}
         {activeAdminTab === 'configuracion' && <AdminSettingsView />}
       </main>
     </div>

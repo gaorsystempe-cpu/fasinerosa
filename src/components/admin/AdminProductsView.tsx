@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Product, CategoryId, ExtraOption } from '../../types';
-import { CATEGORIES } from '../../data/products';
 import { supabaseService } from '../../services/supabaseService';
 import { 
   Plus, 
@@ -32,7 +31,7 @@ const SAMPLE_PERUVIAN_PHOTOS = [
 ];
 
 export const AdminProductsView: React.FC = () => {
-  const { products, toggleProductAvailability, saveProduct, deleteProduct, resetProducts } = useStore();
+  const { products, toggleProductAvailability, saveProduct, deleteProduct, resetProducts, categories } = useStore();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('todos');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -174,7 +173,7 @@ export const AdminProductsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
@@ -184,7 +183,6 @@ export const AdminProductsView: React.FC = () => {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              <span>{cat.icon}</span>
               <span>{cat.name}</span>
             </button>
           ))}
@@ -321,11 +319,11 @@ export const AdminProductsView: React.FC = () => {
                 <div className="col-span-2 sm:col-span-1">
                   <label className="font-bold text-gray-700 block mb-1">Categoría</label>
                   <select
-                    value={editingProduct.category || 'insignias'}
+                    value={editingProduct.category || (categories[1]?.id || 'insignias')}
                     onChange={(e) => setEditingProduct(prev => ({ ...prev, category: e.target.value as CategoryId }))}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-bold text-xs focus:ring-2 focus:ring-[#00167A]"
                   >
-                    {CATEGORIES.filter(c => c.id !== 'todos').map(c => (
+                    {categories.filter(c => c.id !== 'todos').map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
