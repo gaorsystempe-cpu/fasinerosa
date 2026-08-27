@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Product, CategoryId, ExtraOption } from '../../types';
 import { CATEGORIES } from '../../data/products';
+import { supabaseService } from '../../services/supabaseService';
 import { 
   Plus, 
   Search, 
@@ -14,7 +15,11 @@ import {
   Image as ImageIcon, 
   AlertCircle,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  UploadCloud,
+  Camera,
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
 
 const SAMPLE_PERUVIAN_PHOTOS = [
@@ -35,6 +40,36 @@ export const AdminProductsView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [showManualUrl, setShowManualUrl] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check size limit (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('La imagen es muy pesada. Por favor selecciona una imagen menor a 10MB.');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const res = await supabaseService.uploadImage(file, 'dishes');
+      if (res.url) {
+        setEditingProduct(prev => ({ ...prev, image: res.url }));
+      } else {
+        alert(res.error || 'No se pudo subir la imagen. Verifica el bucket de Supabase.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Error al subir la imagen: ' + (err?.message || ''));
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   // Filter
   const filteredProducts = useMemo(() => {
@@ -344,30 +379,112 @@ export const AdminProductsView: React.FC = () => {
                 />
               </div>
 
-              {/* Photo selection */}
-              <div>
-                <label className="font-bold text-gray-700 block mb-1">URL de la Foto</label>
+              {/* Photo selection with direct Device/Camera upload */}
+              <div className="space-y-2">
+                <label className="font-bold text-gray-700 block">Fotografía del Plato *</label>
+
+                {/* Hidden File Input */}
                 <input
-                  type="text"
-                  value={editingProduct.image || ''}
-                  onChange={(e) => setEditingProduct(prev => ({ ...prev, image: e.target.value }))}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs"
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/png, image/jpeg, image/jpg, image/webp"
+                  onChange={handleFileUpload}
+                  className="hidden"
                 />
 
-                <span className="text-[10px] text-gray-400 block mt-1">Fotos sugeridas (toca para aplicar):</span>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {SAMPLE_PERUVIAN_PHOTOS.map(photo => (
-                    <button
-                      key={photo.label}
-                      type="button"
-                      onClick={() => setEditingProduct(prev => ({ ...prev, image: photo.url }))}
-                      className="px-2 py-1 bg-gray-100 hover:bg-[#00167A] hover:text-[#FFF3C1] rounded-lg text-[10px] font-semibold transition-colors"
-                    >
-                      {photo.label}
-                    </button>
-                  ))}
+                {/* Visual Image Box & Uploader */}
+                <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-2xl">
+                  {/* Image Preview */}
+                  <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-gray-200 border border-gray-300 flex-shrink-0 shadow-xs group">
+                    {editingProduct.image ? (
+                      <img
+                        src={editingProduct.image}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 text-[10px]">
+                        <ImageIcon className="w-6 h-6 mb-1" />
+                        <span>Sin foto</span>
+                      </div>
+                    )}
+
+                    {isUploadingPhoto && (
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white">
+                        <Loader2 className="w-5 h-5 animate-spin mb-1 text-[#FFF3C1]" />
+                        <span className="text-[9px] font-bold">Subiendo...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions to upload */}
+                  <div className="flex-1 w-full space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={isUploadingPhoto}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1 py-2 px-3 bg-[#00167A] hover:bg-[#00167A]/90 text-[#FFF3C1] font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all disabled:opacity-50"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>{editingProduct.image ? 'Cambiar Foto (Cámara / Galería)' : 'Subir Foto (Cámara / Galería)'}</span>
+                      </button>
+
+                      {editingProduct.image && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingProduct(prev => ({ ...prev, image: '' }))}
+                          className="py-2 px-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl border border-red-200 cursor-pointer transition-colors"
+                          title="Quitar foto"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-gray-500">
+                        {isUploadingPhoto ? 'Guardando en Supabase Storage...' : 'Soporta JPG, PNG, WEBP (hasta 10MB)'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowManualUrl(!showManualUrl)}
+                        className="text-[10px] text-[#00167A] font-bold hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <span>{showManualUrl ? 'Ocultar opciones URL' : 'O usar link manual'}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Collapsible Manual URL & Suggested photos */}
+                {showManualUrl && (
+                  <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2 mt-2">
+                    <label className="text-[11px] font-bold text-gray-700 block">Ingresar URL directa</label>
+                    <input
+                      type="text"
+                      value={editingProduct.image || ''}
+                      onChange={(e) => setEditingProduct(prev => ({ ...prev, image: e.target.value }))}
+                      placeholder="https://..."
+                      className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
+                    />
+
+                    <span className="text-[10px] text-gray-400 block pt-1">O selecciona una sugerencia rápida:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {SAMPLE_PERUVIAN_PHOTOS.map(photo => (
+                        <button
+                          key={photo.label}
+                          type="button"
+                          onClick={() => setEditingProduct(prev => ({ ...prev, image: photo.url }))}
+                          className="px-2 py-1 bg-white hover:bg-[#00167A] hover:text-[#FFF3C1] border border-gray-200 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer"
+                        >
+                          {photo.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Checkboxes for spicy & popular */}

@@ -649,8 +649,45 @@ INSERT INTO la_facinerosa.cash_shifts (
     185.00, 148.00, 49.00, 119.00, 501.00, 4, 'Turno de apertura en Mercado 2 de Surquillo'
 ) ON CONFLICT (id) DO NOTHING;
 
+-- ============================================================================
+-- 13. SUPABASE STORAGE BUCKET PARA FOTOS DE PLATOS Y PORTADAS
+-- ============================================================================
+-- Bucket exclusivo para imágenes de La Facinerosa (Platos, Banners, Logos)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'la_facinerosa_images',
+  'la_facinerosa_images',
+  TRUE,
+  10485760, -- 10 Megabytes por archivo
+  ARRAY['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
+)
+ON CONFLICT (id) DO UPDATE SET 
+  public = TRUE, 
+  file_size_limit = 10485760;
+
+-- Políticas de lectura y subida libre para el bucket de La Facinerosa
+DROP POLICY IF EXISTS "Public Read la_facinerosa_images" ON storage.objects;
+CREATE POLICY "Public Read la_facinerosa_images"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'la_facinerosa_images');
+
+DROP POLICY IF EXISTS "Public Upload la_facinerosa_images" ON storage.objects;
+CREATE POLICY "Public Upload la_facinerosa_images"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'la_facinerosa_images');
+
+DROP POLICY IF EXISTS "Public Update la_facinerosa_images" ON storage.objects;
+CREATE POLICY "Public Update la_facinerosa_images"
+ON storage.objects FOR UPDATE
+USING (bucket_id = 'la_facinerosa_images');
+
+DROP POLICY IF EXISTS "Public Delete la_facinerosa_images" ON storage.objects;
+CREATE POLICY "Public Delete la_facinerosa_images"
+ON storage.objects FOR DELETE
+USING (bucket_id = 'la_facinerosa_images');
+
 -- Mensaje de confirmación final
 DO $$
 BEGIN
-    RAISE NOTICE '¡Base de datos y Schema la_facinerosa creados e inicializados con éxito en Supabase!';
+    RAISE NOTICE '¡Base de datos, Schema la_facinerosa y Bucket de Imágenes creados con éxito en Supabase!';
 END $$;

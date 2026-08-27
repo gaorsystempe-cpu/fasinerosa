@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { AppSettings } from '../../types';
+import { supabaseService } from '../../services/supabaseService';
 import { 
   Store, 
   MapPin, 
@@ -17,13 +18,46 @@ import {
   CheckCircle, 
   Sparkles,
   Image as ImageIcon,
-  Flame
+  Flame,
+  Camera,
+  Loader2,
+  X
 } from 'lucide-react';
 
 export const AdminSettingsView: React.FC = () => {
   const { settings, updateSettings, resetSettings } = useStore();
   const [formData, setFormData] = useState<AppSettings>({ ...settings });
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isUploadingHero, setIsUploadingHero] = useState(false);
+  const [showManualHeroUrl, setShowManualHeroUrl] = useState(false);
+  const heroInputRef = useRef<HTMLInputElement>(null);
+
+  const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('La imagen de portada es muy pesada (máximo 10MB).');
+      return;
+    }
+
+    setIsUploadingHero(true);
+    try {
+      const res = await supabaseService.uploadImage(file, 'banners');
+      if (res.url) {
+        setFormData(prev => ({ ...prev, heroImage: res.url }));
+        setSavedSuccess(false);
+      } else {
+        alert(res.error || 'No se pudo subir la foto de portada.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Error subiendo imagen: ' + (err?.message || ''));
+    } finally {
+      setIsUploadingHero(false);
+      if (heroInputRef.current) heroInputRef.current.value = '';
+    }
+  };
 
   const handleChange = (field: keyof AppSettings, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -188,14 +222,93 @@ export const AdminSettingsView: React.FC = () => {
             />
           </div>
 
-          <div>
-            <label className="font-bold text-gray-700 block mb-1">URL de la Foto de Portada</label>
+          {/* Hero Banner Image Direct Upload */}
+          <div className="space-y-2 pt-1">
+            <label className="font-bold text-gray-700 block">Foto de Portada Principal (Hero Banner)</label>
+
             <input
-              type="text"
-              value={formData.heroImage}
-              onChange={(e) => handleChange('heroImage', e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#00167A]"
+              type="file"
+              ref={heroInputRef}
+              accept="image/png, image/jpeg, image/jpg, image/webp"
+              onChange={handleHeroUpload}
+              className="hidden"
             />
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-2xl">
+              <div className="relative w-28 h-20 rounded-xl overflow-hidden bg-gray-200 border border-gray-300 flex-shrink-0 shadow-xs">
+                {formData.heroImage ? (
+                  <img
+                    src={formData.heroImage}
+                    alt="Hero Preview"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 text-[10px]">
+                    <ImageIcon className="w-5 h-5 mb-1" />
+                    <span>Sin portada</span>
+                  </div>
+                )}
+
+                {isUploadingHero && (
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white">
+                    <Loader2 className="w-5 h-5 animate-spin mb-1 text-[#FFF3C1]" />
+                    <span className="text-[9px] font-bold">Subiendo...</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 w-full space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={isUploadingHero}
+                    onClick={() => heroInputRef.current?.click()}
+                    className="flex-1 py-2 px-3 bg-[#00167A] hover:bg-[#00167A]/90 text-[#FFF3C1] font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>{formData.heroImage ? 'Cambiar Foto de Portada' : 'Subir Foto de Portada'}</span>
+                  </button>
+
+                  {formData.heroImage && (
+                    <button
+                      type="button"
+                      onClick={() => handleChange('heroImage', '')}
+                      className="py-2 px-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl border border-red-200 cursor-pointer transition-colors"
+                      title="Quitar foto"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-gray-500">
+                    {isUploadingHero ? 'Guardando en Supabase Storage...' : 'Sube foto horizontal de alta calidad'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualHeroUrl(!showManualHeroUrl)}
+                    className="text-[10px] text-[#00167A] font-bold hover:underline cursor-pointer"
+                  >
+                    {showManualHeroUrl ? 'Ocultar URL manual' : 'O usar link manual'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {showManualHeroUrl && (
+              <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 mt-2">
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">Ingresar URL directa</label>
+                <input
+                  type="text"
+                  value={formData.heroImage}
+                  onChange={(e) => handleChange('heroImage', e.target.value)}
+                  placeholder="https://..."
+                  className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
+                />
+              </div>
+            )}
           </div>
         </div>
 

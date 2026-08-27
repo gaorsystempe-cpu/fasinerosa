@@ -552,6 +552,56 @@ export const supabaseService = {
     }
   },
 
+  // --- STORAGE / IMAGES UPLOAD ---
+  async uploadImage(file: File, folder: string = 'dishes'): Promise<{ url: string | null; error?: string }> {
+    if (!this.isAvailable() || !supabase) {
+      // Fallback: Read as base64 data URL if offline/unconfigured
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve({ url: reader.result as string });
+        };
+        reader.onerror = () => {
+          resolve({ url: null, error: 'Error leyendo archivo local' });
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    try {
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const cleanFileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('la_facinerosa_images')
+        .upload(cleanFileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (error) {
+        console.warn('Supabase storage upload error:', error.message);
+        // If bucket doesn't exist or policy blocked, convert to optimized data URL so user isn't stuck
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            resolve({ url: reader.result as string, error: error.message });
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('la_facinerosa_images')
+        .getPublicUrl(cleanFileName);
+
+      return { url: publicUrlData.publicUrl };
+    } catch (e: any) {
+      console.warn('Exception in uploadImage:', e);
+      return { url: null, error: e?.message || 'Error al subir imagen' };
+    }
+  },
+
   // --- REALTIME SUBSCRIPTIONS ---
   subscribeToOrders(onNewOrUpdatedOrder: (payload: any) => void) {
     if (!this.isAvailable() || !supabase) return null;
