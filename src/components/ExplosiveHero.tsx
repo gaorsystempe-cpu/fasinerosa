@@ -30,7 +30,7 @@ export const ExplosiveHero: React.FC<ExplosiveHeroProps> = ({
               {settings.businessName}
             </span>
             <span className="text-[10px] sm:text-[11px] uppercase font-extrabold tracking-wider text-[#00167A] bg-white/70 px-2 py-0.5 rounded-full border border-[#00167A]/15">
-              Surquillo Puesto 651
+              {settings.locationReference || "Surquillo Puesto 651"}
             </span>
           </div>
         </div>

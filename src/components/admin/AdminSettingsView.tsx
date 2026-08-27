@@ -27,6 +27,18 @@ import {
 export const AdminSettingsView: React.FC = () => {
   const { settings, updateSettings, resetSettings } = useStore();
   const [formData, setFormData] = useState<AppSettings>({ ...settings });
+  
+  React.useEffect(() => {
+    setFormData(current => {
+      // If current form has no business name (empty default state),
+      // and incoming settings has one, hydrate the form.
+      if (!current.businessName && settings.businessName) {
+        return { ...settings };
+      }
+      return current;
+    });
+  }, [settings]);
+
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isUploadingHero, setIsUploadingHero] = useState(false);
   const [showManualHeroUrl, setShowManualHeroUrl] = useState(false);

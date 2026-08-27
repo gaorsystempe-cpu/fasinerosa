@@ -1,6 +1,7 @@
+import { useStore } from '../context/StoreContext';
 import React from 'react';
 
-export const FloatingDishArt: React.FC = () => {
+export const FloatingDishArt: React.FC = () => {  const { settings } = useStore();
   return (
     <div className="relative w-full max-w-[340px] sm:max-w-[420px] md:max-w-[480px] mx-auto my-3 sm:my-6 select-none flex flex-col items-center">
       
@@ -122,7 +123,7 @@ export const FloatingDishArt: React.FC = () => {
           {/* Gourmet Cazuela Rim / Border */}
           <div className="w-full h-full rounded-full overflow-hidden relative shadow-inner border-4 sm:border-6 border-[#FFF3C1]">
             <img
-              src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=85"
+              src={settings?.heroImage || "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=85"}
               alt="Seco de Chabelo Tradicional al Batán - La Facinerosa"
               className="w-full h-full object-cover transform scale-105 hover:scale-110 transition-transform duration-700"
             />
@@ -135,7 +136,7 @@ export const FloatingDishArt: React.FC = () => {
           <div className="absolute -bottom-2 sm:-bottom-3 bg-[#00167A] text-[#FFF3C1] border-2 border-[#FFF3C1] px-4 py-1.5 rounded-full shadow-xl flex items-center gap-1.5 z-30">
             <span className="text-sm">🔥</span>
             <span className="font-gotham font-extrabold text-[11px] sm:text-xs tracking-wider uppercase">
-              Seco de Chabelo al Batán
+              {settings?.heroBadge || "Especialidad de la Casa"}
             </span>
           </div>
 
