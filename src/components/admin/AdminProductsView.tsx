@@ -34,6 +34,7 @@ export const AdminProductsView: React.FC = () => {
   // Product Edit Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Filter
   const filteredProducts = useMemo(() => {
@@ -72,16 +73,23 @@ export const AdminProductsView: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct || !editingProduct.name || !editingProduct.price) {
       alert('Por favor completa el nombre y precio del plato.');
       return;
     }
 
-    saveProduct(editingProduct as Product);
-    setIsModalOpen(false);
-    setEditingProduct(null);
+    setIsSaving(true);
+    try {
+      await saveProduct(editingProduct as Product);
+      setIsModalOpen(false);
+      setEditingProduct(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -388,16 +396,25 @@ export const AdminProductsView: React.FC = () => {
               <div className="pt-3 border-t border-gray-200 flex gap-2">
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={() => setIsModalOpen(false)}
-                  className="w-1/3 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl"
+                  className="w-1/3 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl cursor-pointer disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="w-2/3 py-2.5 bg-[#00167A] hover:bg-[#00167A]/90 text-[#FFF3C1] font-bold rounded-xl shadow-md"
+                  disabled={isSaving}
+                  className="w-2/3 py-2.5 bg-[#00167A] hover:bg-[#00167A]/90 text-[#FFF3C1] font-bold rounded-xl shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Guardar Plato
+                  {isSaving ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-[#FFF3C1] border-t-transparent rounded-full animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    'Guardar Plato'
+                  )}
                 </button>
               </div>
             </form>

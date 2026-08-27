@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { AdminTab } from '../../types';
 import { 
@@ -12,7 +12,10 @@ import {
   Coins, 
   Clock, 
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  RefreshCw,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { AdminPOSView } from './AdminPOSView';
 import { AdminWebOrdersView } from './AdminWebOrdersView';
@@ -32,8 +35,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onReturnToStorefront }
     orders, 
     cashShift, 
     logoutAdmin,
-    settings 
+    settings,
+    isSupabaseOnline,
+    syncStatus,
+    syncWithSupabase
   } = useStore();
+
+  const [isSyncingManually, setIsSyncingManually] = useState(false);
+
+  const handleManualSync = async () => {
+    setIsSyncingManually(true);
+    await syncWithSupabase();
+    setTimeout(() => setIsSyncingManually(false), 800);
+  };
 
   const pendingOrdersCount = orders.filter(o => o.status === 'recibido').length;
 
@@ -72,8 +86,24 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onReturnToStorefront }
               </div>
             </div>
 
-            {/* Quick Actions (View Storefront & Logout) */}
-            <div className="flex items-center gap-2">
+            {/* Quick Actions (Sync Status, View Storefront & Logout) */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={handleManualSync}
+                className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isSupabaseOnline
+                    ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30 hover:bg-emerald-500/30'
+                    : 'bg-amber-500/20 text-amber-200 border-amber-400/30 hover:bg-amber-500/30'
+                }`}
+                title={isSupabaseOnline ? 'Supabase Conectado en Vivo (Click para forzar sincronización)' : 'Modo Offline / LocalStorage (Click para reintentar conexión)'}
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncingManually || syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                <span className="hidden md:inline">
+                  {isSupabaseOnline ? 'Nube Sincronizada' : 'Modo Local'}
+                </span>
+              </button>
+
               <button
                 type="button"
                 onClick={onReturnToStorefront}

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Product, 
   Order, 
@@ -23,9 +23,9 @@ interface StoreContextType {
   // Products
   products: Product[];
   toggleProductAvailability: (id: string) => void;
-  saveProduct: (product: Product) => void;
-  deleteProduct: (id: string) => void;
-  resetProducts: () => void;
+  saveProduct: (product: Product) => Promise<boolean>;
+  deleteProduct: (id: string) => Promise<boolean>;
+  resetProducts: () => Promise<void>;
 
   // Web Orders
   orders: Order[];
@@ -48,6 +48,11 @@ interface StoreContextType {
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   resetSettings: () => void;
+
+  // Cloud Sync & Realtime Status
+  isSupabaseOnline: boolean;
+  syncStatus: 'connected' | 'disconnected' | 'syncing';
+  syncWithSupabase: () => Promise<void>;
 
   // Admin Auth & Navigation
   isAdmin: boolean;
@@ -73,6 +78,12 @@ const STORAGE_KEYS = {
 };
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // --- Sync State ---
+  const [isSupabaseOnline, setIsSupabaseOnline] = useState<boolean>(isSupabaseConfigured);
+  const [syncStatus, setSyncStatus] = useState<'connected' | 'disconnected' | 'syncing'>(
+    isSupabaseConfigured ? 'connected' : 'disconnected'
+  );
+
   // --- Products State ---
   const [products, setProducts] = useState<Product[]>(() => {
     try {
@@ -141,41 +152,152 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isPOSOpen, setIsPOSOpen] = useState<boolean>(false);
 
-  // Initial Load from Supabase (if configured)
+  const isSeedingRef = useRef(false);
+
+  // --- Bidirectional Sync Function ---
+  const syncWithSupabase = useCallback(async () => {
+    if (!supabaseService.isAvailable()) {
+      setIsSupabaseOnline(false);
+      setSyncStatus('disconnected');
+      return;
+    }
+
+    setSyncStatus('syncing');
+
+    try {
+      // 1. Products Sync
+      const remoteProducts = await supabaseService.getProducts();
+      if (remoteProducts !== null) {
+        if (remoteProducts.length > 0) {
+          setProducts(remoteProducts);
+        } else if (!isSeedingRef.current) {
+          // Table exists but is empty -> Auto seed initial catalog so all devices sync immediately!
+          isSeedingRef.current = true;
+          await supabaseService.seedDefaultProducts(PRODUCTS.map(p => ({ ...p, isAvailable: true })));
+          const seeded = await supabaseService.getProducts();
+          if (seeded && seeded.length > 0) {
+            setProducts(seeded);
+          }
+          isSeedingRef.current = false;
+        }
+      }
+
+      // 2. Orders Sync
+      const remoteOrders = await supabaseService.getWebOrders();
+      if (remoteOrders && remoteOrders.length > 0) {
+        setOrders(prev => {
+          const remoteMap = new Map(remoteOrders.map(o => [o.id, o]));
+          const combined = [...remoteOrders];
+          for (const local of prev) {
+            if (!remoteMap.has(local.id)) {
+              combined.push(local);
+            }
+          }
+          return combined;
+        });
+      }
+
+      // 3. POS Sales Sync
+      const remoteSales = await supabaseService.getPOSSales();
+      if (remoteSales && remoteSales.length > 0) {
+        setPosSales(prev => {
+          const remoteMap = new Map(remoteSales.map(s => [s.id, s]));
+          const combined = [...remoteSales];
+          for (const local of prev) {
+            if (!remoteMap.has(local.id)) {
+              combined.push(local);
+            }
+          }
+          return combined;
+        });
+      }
+
+      // 4. App Settings Sync
+      const remoteSettings = await supabaseService.getAppSettings();
+      if (remoteSettings) {
+        setSettings(prev => ({ ...prev, ...remoteSettings }));
+      }
+
+      // 5. Active Cash Shift Sync
+      const remoteShift = await supabaseService.getActiveCashShift();
+      if (remoteShift) {
+        setCashShift(remoteShift);
+      }
+
+      setIsSupabaseOnline(true);
+      setSyncStatus('connected');
+    } catch (err) {
+      console.warn('Sync error with Supabase:', err);
+      setSyncStatus('connected');
+    }
+  }, []);
+
+  // Initial Load from Supabase & Realtime Listeners
   useEffect(() => {
     if (supabaseService.isAvailable()) {
-      supabaseService.getWebOrders().then(remoteOrders => {
-        if (remoteOrders && remoteOrders.length > 0) {
-          setOrders(prev => {
-            // Merge remote orders with any existing local unique orders
-            const remoteMap = new Map(remoteOrders.map(o => [o.id, o]));
-            const combined = [...remoteOrders];
-            for (const local of prev) {
-              if (!remoteMap.has(local.id)) {
-                combined.push(local);
-              }
-            }
-            return combined;
-          });
-        }
-      });
+      syncWithSupabase();
 
-      // Realtime subscription for incoming orders
-      const channel = supabaseService.subscribeToOrders(() => {
+      // Realtime subscription for incoming web orders
+      const ordersChannel = supabaseService.subscribeToOrders(() => {
         supabaseService.getWebOrders().then(fresh => {
           if (fresh) setOrders(fresh);
         });
       });
 
+      // Realtime subscription for POS sales
+      const salesChannel = supabaseService.subscribeToPOSSales(() => {
+        supabaseService.getPOSSales().then(fresh => {
+          if (fresh) setPosSales(fresh);
+        });
+      });
+
+      // Realtime subscription for Products & Stock
+      const productsChannel = supabaseService.subscribeToProducts(() => {
+        supabaseService.getProducts().then(fresh => {
+          if (fresh && fresh.length > 0) setProducts(fresh);
+        });
+      });
+
+      // Realtime subscription for Settings
+      const settingsChannel = supabaseService.subscribeToSettings(() => {
+        supabaseService.getAppSettings().then(fresh => {
+          if (fresh) setSettings(fresh);
+        });
+      });
+
+      // Realtime subscription for Cash Shifts
+      const shiftsChannel = supabaseService.subscribeToCashShifts(() => {
+        supabaseService.getActiveCashShift().then(fresh => {
+          if (fresh) setCashShift(fresh);
+        });
+      });
+
+      // Fast polling interval (every 8 seconds) as a guarantee for multi-device sync
+      const interval = setInterval(() => {
+        syncWithSupabase();
+      }, 8000);
+
+      // Instant refresh on tab focus / visibility change
+      const handleFocus = () => {
+        syncWithSupabase();
+      };
+      window.addEventListener('focus', handleFocus);
+      document.addEventListener('visibilitychange', handleFocus);
+
       return () => {
-        if (channel) {
-          channel.unsubscribe();
-        }
+        clearInterval(interval);
+        window.removeEventListener('focus', handleFocus);
+        document.removeEventListener('visibilitychange', handleFocus);
+        if (ordersChannel) ordersChannel.unsubscribe();
+        if (salesChannel) salesChannel.unsubscribe();
+        if (productsChannel) productsChannel.unsubscribe();
+        if (settingsChannel) settingsChannel.unsubscribe();
+        if (shiftsChannel) shiftsChannel.unsubscribe();
       };
     }
-  }, []);
+  }, [syncWithSupabase]);
 
-  // Sync to LocalStorage
+  // Sync to LocalStorage as offline backup
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
@@ -226,12 +348,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // --- Product Methods ---
   const toggleProductAvailability = (id: string) => {
+    const target = products.find(p => p.id === id);
+    const nextState = target?.isAvailable === false ? true : false;
+
     setProducts(prev =>
-      prev.map(p => (p.id === id ? { ...p, isAvailable: p.isAvailable === false ? true : false } : p))
+      prev.map(p => (p.id === id ? { ...p, isAvailable: nextState } : p))
     );
+
+    if (supabaseService.isAvailable()) {
+      supabaseService.updateProductAvailability(id, nextState);
+    }
   };
 
-  const saveProduct = (product: Product) => {
+  const saveProduct = async (product: Product): Promise<boolean> => {
     setProducts(prev => {
       const exists = prev.some(p => p.id === product.id);
       if (exists) {
@@ -239,14 +368,28 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       return [product, ...prev];
     });
+
+    if (supabaseService.isAvailable()) {
+      const success = await supabaseService.saveProduct(product);
+      return success;
+    }
+    return true;
   };
 
-  const deleteProduct = (id: string) => {
+  const deleteProduct = async (id: string): Promise<boolean> => {
     setProducts(prev => prev.filter(p => p.id !== id));
+    if (supabaseService.isAvailable()) {
+      return await supabaseService.deleteProduct(id);
+    }
+    return true;
   };
 
-  const resetProducts = () => {
-    setProducts(PRODUCTS.map(p => ({ ...p, isAvailable: true })));
+  const resetProducts = async (): Promise<void> => {
+    const defaults = PRODUCTS.map(p => ({ ...p, isAvailable: true }));
+    setProducts(defaults);
+    if (supabaseService.isAvailable()) {
+      await supabaseService.seedDefaultProducts(defaults);
+    }
   };
 
   // --- Web Orders Methods ---
@@ -328,7 +471,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const isPlin = newSale.paymentMethod === 'plin';
         const isCard = newSale.paymentMethod === 'pos';
 
-        return {
+        const updated = {
           ...prev,
           cashSales: prev.cashSales + (isCash ? newSale.total : 0),
           yapeSales: prev.yapeSales + (isYape ? newSale.total : 0),
@@ -337,6 +480,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           totalSales: prev.totalSales + newSale.total,
           salesCount: prev.salesCount + 1,
         };
+
+        if (supabaseService.isAvailable()) {
+          supabaseService.saveCashShift(updated);
+        }
+
+        return updated;
       });
     }
 
@@ -365,29 +514,46 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       salesCount: 0,
     };
     setCashShift(newShift);
+    if (supabaseService.isAvailable()) {
+      supabaseService.saveCashShift(newShift);
+    }
   };
 
   const closeCashShift = (finalCountedCash: number, notes?: string) => {
     const expectedCash = cashShift.initialCash + cashShift.cashSales;
     const diff = finalCountedCash - expectedCash;
 
-    setCashShift(prev => ({
-      ...prev,
+    const closedShift: CashShift = {
+      ...cashShift,
       isOpen: false,
       closedAt: new Date().toISOString(),
       finalCountedCash,
       cashDifference: diff,
       notes: notes || '',
-    }));
+    };
+
+    setCashShift(closedShift);
+    if (supabaseService.isAvailable()) {
+      supabaseService.saveCashShift(closedShift);
+    }
   };
 
   // --- Settings Methods ---
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    setSettings(prev => {
+      const merged = { ...prev, ...newSettings };
+      if (supabaseService.isAvailable()) {
+        supabaseService.saveAppSettings(merged);
+      }
+      return merged;
+    });
   };
 
   const resetSettings = () => {
     setSettings(DEFAULT_SETTINGS);
+    if (supabaseService.isAvailable()) {
+      supabaseService.saveAppSettings(DEFAULT_SETTINGS);
+    }
   };
 
   // --- Admin Auth Methods ---
@@ -439,6 +605,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         settings,
         updateSettings,
         resetSettings,
+
+        isSupabaseOnline,
+        syncStatus,
+        syncWithSupabase,
 
         isAdmin,
         activeAdminTab,

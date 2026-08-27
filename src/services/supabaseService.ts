@@ -1,8 +1,24 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Order, POSSale, OrderStatus, OrderPaymentStatus } from '../types';
+import { Order, POSSale, OrderStatus, OrderPaymentStatus, Product, CashShift, AppSettings, ExtraOption } from '../types';
 
 export const supabaseService = {
   isAvailable: () => isSupabaseConfigured && !!supabase,
+
+  // --- HEALTH & TEST CONNECTION ---
+  async testConnection(): Promise<{ ok: boolean; message: string }> {
+    if (!this.isAvailable() || !supabase) {
+      return { ok: false, message: 'Variables de Supabase no configuradas o incompletas' };
+    }
+    try {
+      const { data, error } = await supabase.from('app_settings').select('id').limit(1);
+      if (error) {
+        return { ok: false, message: `Error en schema la_facinerosa: ${error.message}` };
+      }
+      return { ok: true, message: 'Conectado exitosamente con Supabase y schema la_facinerosa' };
+    } catch (e: any) {
+      return { ok: false, message: `Excepción de red: ${e?.message || 'Desconocido'}` };
+    }
+  },
 
   // --- ORDERS ---
   async getWebOrders(): Promise<Order[] | null> {
@@ -163,6 +179,62 @@ export const supabaseService = {
   },
 
   // --- POS SALES ---
+  async getPOSSales(): Promise<POSSale[] | null> {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('pos_sales')
+        .select(`
+          *,
+          pos_sale_items (*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Error fetching POS sales from Supabase:', error.message);
+        return null;
+      }
+
+      if (!data) return [];
+
+      return data.map((row: any) => ({
+        id: row.id,
+        saleNumber: row.sale_number,
+        saleType: row.sale_type,
+        tableNumber: row.table_number,
+        cashierName: row.cashier_name,
+        customerName: row.customer_name,
+        customerDoc: row.customer_doc,
+        paymentMethod: row.payment_method,
+        cashGiven: row.cash_given ? Number(row.cash_given) : (row.amount_tendered ? Number(row.amount_tendered) : undefined),
+        changeAmount: Number(row.change_amount || row.change_due || 0),
+        subtotal: Number(row.subtotal),
+        discount: Number(row.discount || row.discount_amount || 0),
+        total: Number(row.total),
+        status: row.status,
+        createdAt: row.created_at,
+        items: (row.pos_sale_items || []).map((item: any, idx: number) => ({
+          id: item.id || `pos-item-${idx}`,
+          product: {
+            id: item.product_id || '',
+            name: item.product_name,
+            price: Number(item.unit_price),
+            description: '',
+            category: 'especiales',
+            image: '',
+          },
+          quantity: item.quantity,
+          spiceLevel: item.spice_level,
+          selectedExtras: item.selected_extras || [],
+          itemTotal: Number(item.item_total),
+        })),
+      }));
+    } catch (e) {
+      console.warn('Supabase getPOSSales error:', e);
+      return null;
+    }
+  },
+
   async createPOSSale(sale: POSSale): Promise<boolean> {
     if (!this.isAvailable() || !supabase) return false;
     try {
@@ -175,10 +247,10 @@ export const supabaseService = {
         customer_name: sale.customerName || null,
         customer_doc: sale.customerDoc || null,
         payment_method: sale.paymentMethod,
-        amount_tendered: sale.cashGiven || null,
-        change_due: sale.changeAmount || 0,
+        cash_given: sale.cashGiven || null,
+        change_amount: sale.changeAmount || 0,
         subtotal: sale.subtotal,
-        discount_amount: sale.discount || 0,
+        discount: sale.discount || 0,
         total: sale.total,
         status: sale.status,
         created_at: sale.createdAt,
@@ -211,6 +283,275 @@ export const supabaseService = {
     }
   },
 
+  // --- PRODUCTS ---
+  async getProducts(): Promise<Product[] | null> {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          product_extras (*)
+        `)
+        .order('display_order', { ascending: true });
+
+      if (error || !data) {
+        console.warn('Error fetching products from Supabase:', error?.message);
+        return null;
+      }
+
+      if (data.length === 0) {
+        return [];
+      }
+
+      return data.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        price: Number(row.price),
+        category: row.category_code,
+        image: row.image_url,
+        badge: row.badge,
+        isPopular: Boolean(row.is_popular),
+        isSpicy: Boolean(row.is_spicy),
+        isAvailable: row.is_available ?? true,
+        prepTime: row.prep_time,
+        portions: row.portions,
+        availableExtras: row.product_extras && row.product_extras.length > 0
+          ? row.product_extras.map((ex: any) => ({
+              id: ex.id,
+              name: ex.name,
+              price: Number(ex.price || 0),
+            }))
+          : undefined,
+      }));
+    } catch (e) {
+      console.warn('Supabase getProducts error:', e);
+      return null;
+    }
+  },
+
+  async saveProduct(product: Product): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      // 1. Ensure category is valid
+      const validCategories = ['insignias', 'entradas', 'marinos', 'rondas', 'bebidas', 'guarniciones'];
+      const categoryCode = validCategories.includes(product.category) ? product.category : 'insignias';
+
+      const { error } = await supabase.from('products').upsert({
+        id: product.id,
+        category_code: categoryCode,
+        name: product.name,
+        description: product.description || '',
+        price: Number(product.price),
+        image_url: product.image || 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80',
+        badge: product.badge || null,
+        is_popular: Boolean(product.isPopular),
+        is_spicy: Boolean(product.isSpicy),
+        is_available: product.isAvailable !== false,
+        prep_time: product.prepTime || '15-20 min',
+        portions: product.portions || '1-2 personas',
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        console.error('Error saving product in Supabase:', error.message);
+        return false;
+      }
+
+      // 2. Save available extras if provided
+      if (product.availableExtras && product.availableExtras.length > 0) {
+        const extrasToUpsert = product.availableExtras.map((ex, idx) => ({
+          id: ex.id ? `${product.id}-${ex.id}` : `${product.id}-ex-${idx}`,
+          product_id: product.id,
+          name: ex.name,
+          price: Number(ex.price || 0),
+          is_available: true,
+        }));
+
+        await supabase.from('product_extras').upsert(extrasToUpsert);
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Supabase saveProduct exception:', e);
+      return false;
+    }
+  },
+
+  async deleteProduct(productId: string): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', productId);
+      if (error) {
+        console.warn('Error deleting product in Supabase:', error.message);
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async seedDefaultProducts(defaultProducts: Product[]): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      for (const p of defaultProducts) {
+        await this.saveProduct(p);
+      }
+      return true;
+    } catch (e) {
+      console.warn('Error seeding products:', e);
+      return false;
+    }
+  },
+
+  async updateProductAvailability(productId: string, isAvailable: boolean): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_available: isAvailable, updated_at: new Date().toISOString() })
+        .eq('id', productId);
+      return !error;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // --- CASH SHIFT ---
+  async getActiveCashShift(): Promise<CashShift | null> {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('cash_shifts')
+        .select('*')
+        .eq('is_open', true)
+        .order('opened_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) return null;
+
+      return {
+        id: data.id,
+        isOpen: data.is_open,
+        openedAt: data.opened_at,
+        closedAt: data.closed_at,
+        initialCash: Number(data.initial_cash || 0),
+        cashierName: data.cashier_name || 'Cajero Principal',
+        cashSales: Number(data.cash_sales || 0),
+        yapeSales: Number(data.yape_sales || 0),
+        plinSales: Number(data.plin_sales || 0),
+        cardSales: Number(data.card_sales || 0),
+        totalSales: Number(data.total_sales || 0),
+        salesCount: Number(data.sales_count || 0),
+        finalCountedCash: data.final_counted_cash ? Number(data.final_counted_cash) : undefined,
+        cashDifference: data.cash_difference ? Number(data.cash_difference) : undefined,
+        notes: data.notes || '',
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  async saveCashShift(shift: CashShift): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      const { error } = await supabase.from('cash_shifts').upsert({
+        id: shift.id,
+        is_open: shift.isOpen,
+        opened_at: shift.openedAt,
+        closed_at: shift.closedAt || null,
+        initial_cash: shift.initialCash,
+        cashier_name: shift.cashierName,
+        cash_sales: shift.cashSales,
+        yape_sales: shift.yapeSales,
+        plin_sales: shift.plinSales,
+        card_sales: shift.cardSales,
+        total_sales: shift.totalSales,
+        sales_count: shift.salesCount,
+        final_counted_cash: shift.finalCountedCash || null,
+        cash_difference: shift.cashDifference || null,
+        notes: shift.notes || null,
+        updated_at: new Date().toISOString(),
+      });
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  // --- APP SETTINGS ---
+  async getAppSettings(): Promise<AppSettings | null> {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('*')
+        .eq('id', 'default')
+        .maybeSingle();
+
+      if (error || !data) return null;
+
+      return {
+        businessName: data.business_name,
+        businessTagline: data.business_tagline,
+        address: data.address,
+        locationReference: data.location_reference,
+        phone: data.phone,
+        whatsappNumber: data.whatsapp_number,
+        openingHours: data.opening_hours,
+        bannerNotice: data.banner_notice,
+        heroBadge: data.hero_badge,
+        heroTitle: data.hero_title,
+        heroSubtitle: data.hero_subtitle,
+        heroImage: data.hero_image,
+        socialInstagram: data.social_instagram,
+        socialTiktok: data.social_tiktok,
+        socialFacebook: data.social_facebook,
+        socialGoogleMaps: data.social_google_maps,
+        freeDeliveryThreshold: Number(data.free_delivery_threshold || 80),
+        baseDeliveryFee: Number(data.base_delivery_fee || 6),
+        adminPin: data.admin_pin || '1234',
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  async saveAppSettings(settings: AppSettings): Promise<boolean> {
+    if (!this.isAvailable() || !supabase) return false;
+    try {
+      const { error } = await supabase.from('app_settings').upsert({
+        id: 'default',
+        business_name: settings.businessName,
+        business_tagline: settings.businessTagline,
+        address: settings.address,
+        location_reference: settings.locationReference,
+        phone: settings.phone,
+        whatsapp_number: settings.whatsappNumber,
+        opening_hours: settings.openingHours,
+        banner_notice: settings.bannerNotice,
+        hero_badge: settings.heroBadge,
+        hero_title: settings.heroTitle,
+        hero_subtitle: settings.heroSubtitle,
+        hero_image: settings.heroImage,
+        social_instagram: settings.socialInstagram,
+        social_tiktok: settings.socialTiktok,
+        social_facebook: settings.socialFacebook,
+        social_google_maps: settings.socialGoogleMaps,
+        free_delivery_threshold: settings.freeDeliveryThreshold,
+        base_delivery_fee: settings.baseDeliveryFee,
+        admin_pin: settings.adminPin,
+        updated_at: new Date().toISOString(),
+      });
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
   // --- REALTIME SUBSCRIPTIONS ---
   subscribeToOrders(onNewOrUpdatedOrder: (payload: any) => void) {
     if (!this.isAvailable() || !supabase) return null;
@@ -228,7 +569,91 @@ export const supabaseService = {
 
       return channel;
     } catch (e) {
-      console.warn('Failed to subscribe to Supabase realtime:', e);
+      console.warn('Failed to subscribe to Supabase web_orders realtime:', e);
+      return null;
+    }
+  },
+
+  subscribeToPOSSales(onNewOrUpdatedSale: (payload: any) => void) {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const channel = supabase
+        .channel('pos_sales_realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'la_facinerosa', table: 'pos_sales' },
+          (payload) => {
+            onNewOrUpdatedSale(payload);
+          }
+        )
+        .subscribe();
+
+      return channel;
+    } catch (e) {
+      console.warn('Failed to subscribe to Supabase pos_sales realtime:', e);
+      return null;
+    }
+  },
+
+  subscribeToProducts(onProductsChange: (payload: any) => void) {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const channel = supabase
+        .channel('products_realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'la_facinerosa', table: 'products' },
+          (payload) => {
+            onProductsChange(payload);
+          }
+        )
+        .subscribe();
+
+      return channel;
+    } catch (e) {
+      console.warn('Failed to subscribe to Supabase products realtime:', e);
+      return null;
+    }
+  },
+
+  subscribeToSettings(onSettingsChange: (payload: any) => void) {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const channel = supabase
+        .channel('settings_realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'la_facinerosa', table: 'app_settings' },
+          (payload) => {
+            onSettingsChange(payload);
+          }
+        )
+        .subscribe();
+
+      return channel;
+    } catch (e) {
+      console.warn('Failed to subscribe to Supabase settings realtime:', e);
+      return null;
+    }
+  },
+
+  subscribeToCashShifts(onShiftChange: (payload: any) => void) {
+    if (!this.isAvailable() || !supabase) return null;
+    try {
+      const channel = supabase
+        .channel('cash_shifts_realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'la_facinerosa', table: 'cash_shifts' },
+          (payload) => {
+            onShiftChange(payload);
+          }
+        )
+        .subscribe();
+
+      return channel;
+    } catch (e) {
+      console.warn('Failed to subscribe to Supabase cash_shifts realtime:', e);
       return null;
     }
   },
