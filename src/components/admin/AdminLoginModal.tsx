@@ -109,9 +109,6 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     setError(false);
   };
 
-  const handleQuickDefaultLogin = () => {
-    attemptLogin(settings.adminPin || '1234');
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
@@ -171,7 +168,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           {error && (
             <div className="flex items-center gap-1.5 text-xs text-red-600 font-bold mb-3 bg-red-50 px-3 py-1.5 rounded-xl border border-red-200">
               <ShieldAlert className="w-4 h-4 shrink-0" />
-              <span>PIN incorrecto. El PIN por defecto es <strong>1234</strong>.</span>
+              <span>PIN incorrecto. Inténtalo nuevamente.</span>
             </div>
           )}
 
@@ -225,21 +222,6 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             <ArrowRight className="w-4 h-4" />
           </button>
 
-          {/* Quick Access Helper Button */}
-          <div className="w-full pt-3 mt-3 border-t border-gray-100 flex flex-col items-center gap-2">
-            <button
-              type="button"
-              onClick={handleQuickDefaultLogin}
-              className="w-full py-2 px-3 bg-amber-50 hover:bg-amber-100 text-[#00167A] border border-amber-300/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>Acceso Rápido con PIN Maestro (1234)</span>
-            </button>
-            
-            <p className="text-[10px] text-gray-400 text-center">
-              PIN configurado: <strong className="text-[#00167A] font-bold">{settings.adminPin || '1234'}</strong> (modificable en Configuración)
-            </p>
-          </div>
 
         </div>
       </div>

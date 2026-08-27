@@ -594,7 +594,7 @@ export const supabaseService = {
         socialGoogleMaps: data.social_google_maps,
         freeDeliveryThreshold: Number(data.free_delivery_threshold || 80),
         baseDeliveryFee: Number(data.base_delivery_fee || 6),
-        adminPin: data.admin_pin || '1234',
+        adminPin: data.admin_pin || '1982',
       };
     } catch {
       return null;

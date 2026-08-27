@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   socialGoogleMaps: 'https://maps.google.com/?q=Mercado+2+de+Surquillo+puesto+651+Lima+Peru',
   freeDeliveryThreshold: 80,
   baseDeliveryFee: 6,
-  adminPin: '1234',
+  adminPin: '1982',
 };
 
 export const INITIAL_ORDERS: Order[] = [

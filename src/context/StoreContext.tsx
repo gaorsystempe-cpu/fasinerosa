@@ -640,10 +640,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // --- Admin Auth Methods ---
   const loginAdmin = (pin: string): boolean => {
     const clean = pin.trim().toLowerCase();
-    const configPin = (settings.adminPin || '1234').trim().toLowerCase();
+    const configPin = (settings.adminPin || '1982').trim().toLowerCase();
     if (
       clean === configPin ||
-      clean === '1234' ||
+      clean === '1982' ||
       clean === '0000' ||
       clean === 'admin' ||
       clean === 'admin123'
